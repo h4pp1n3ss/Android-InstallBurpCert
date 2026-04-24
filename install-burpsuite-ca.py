@@ -52,8 +52,21 @@ def get_root():
             print("[-] Error: remount failed, check command manually")
             n += 1
     
+
+def is_burp_reachable(host="127.0.0.1", port=8080):
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=3):
+            return True 
+    except (ConnectionRefusedError, socket.timeout, OSError):
+        return False
+
 def download_burp_certificate():
 
+    if not is_burp_reachable():
+        print("[-] Error: Burp Suite proxy is not reachable at 127.0.0.1")
+        exit(1)
+    print("[+] Info: Burp Suite proxy is reachable")
     output = subprocess.getoutput("curl --proxy http://127.0.0.1:8080 -o cacert.der http://burp/cert")
 
     try:
