@@ -1,4 +1,7 @@
 import subprocess
+import os
+import time
+import sys
 
 __author__ = "h4pp1n3ss"
 __date__ = "18062021"
@@ -11,9 +14,6 @@ __description__ = '''\
 
         '''
 
-import os
-import time
-import sys
 
 if not sys.version.startswith('3'):
     print("[!] Error:  This script only work with Python3\n")
@@ -21,7 +21,11 @@ if not sys.version.startswith('3'):
 
 
 def is_device_up():
+    """Check whether an Android emulator is visible to adb.
 
+    Returns:
+        bool: True if at least one emulator appears in `adb devices` output, False otherwise.
+    """
     output =  subprocess.getoutput("adb devices")
 
     if "emulator" in output:
@@ -31,7 +35,11 @@ def is_device_up():
         return False
 
 def get_root():
+    """Restart adb as root and remount the system partition as writable.
 
+    Runs `adb root` to elevate the adb daemon, then retries `adb remount`
+    in a loop until the system partition is successfully remounted.
+    """
     messages = ['restarting adbd as root', 'adbd is already running as root']
    
  
@@ -54,6 +62,15 @@ def get_root():
     
 
 def is_burp_reachable(host="127.0.0.1", port=8080):
+    """Check whether the Burp Suite proxy listener is accepting connections.
+
+    Args:
+        host (str): Proxy host address. Defaults to "127.0.0.1".
+        port (int): Proxy port. Defaults to 8080.
+
+    Returns:
+        bool: True if a TCP connection to host:port succeeds within 3 seconds, False otherwise.
+    """
     import socket
     try:
         with socket.create_connection((host, port), timeout=3):
@@ -62,7 +79,13 @@ def is_burp_reachable(host="127.0.0.1", port=8080):
         return False
 
 def download_burp_certificate():
+    """Download and convert the Burp Suite CA certificate.
 
+    Fetches the DER-encoded certificate from Burp's built-in web server via
+    the proxy, converts it to PEM with openssl, and copies it to the
+    Android-expected filename derived from the certificate's subject hash
+    (e.g. ``9a5ba575.0``). Exits with code 1 if the proxy is unreachable.
+    """
     if not is_burp_reachable():
         print("[-] Error: Burp Suite proxy is not reachable at 127.0.0.1")
         exit(1)
@@ -83,7 +106,13 @@ def download_burp_certificate():
 
 
 def install_burp_certificate():
+    """Push the Burp CA certificate to the Android emulator's trusted CA store.
 
+    Determines the hash-named certificate file produced by
+    ``download_burp_certificate()``, skips installation if it is already
+    present in ``/system/etc/security/cacerts/``, otherwise pushes it via
+    ``/sdcard/`` and sets permissions to 644.
+    """
     # Check if the certificate exists
 
     ca = subprocess.getoutput("ls $(openssl x509 -inform PEM -subject_hash_old -in cacert.pem |head -1).0")
@@ -103,7 +132,7 @@ def install_burp_certificate():
         print("[+] Info: Certificate {} installed sucessfully".format(ca))
     
 def main():
-
+    """Entry point — orchestrate device check, root, cert download, and installation."""
     if is_device_up():
         print("[*] Info: Device attached")
     else:
